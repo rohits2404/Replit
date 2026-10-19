@@ -6,6 +6,8 @@ import { authorizePreviewAccess } from "@/lib/preview/access";
 import { serveArtifactFile } from "@/lib/preview/serve-preview";
 import { normalizeRelativePath } from "@/lib/project-files";
 
+export const runtime = "nodejs";
+
 async function getSessionUserId() {
     const session = await auth.api.getSession({ headers: await headers() });
     return session?.user?.id ?? null;
