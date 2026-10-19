@@ -1,10 +1,19 @@
 import type { ArtifactType } from "@/generated/prisma/client";
-import type Anthropic from "@anthropic-ai/sdk";
 
 import {
     detectProjectStack,
     type ProjectStack,
 } from "@/lib/preview/detect-preview-mode";
+
+type AgentToolDefinition = {
+    name: string;
+    description: string;
+    input_schema: {
+        type: "object";
+        properties: Record<string, unknown>;
+        required: string[];
+    };
+};
 
 export const PLAN_MODE_ENABLED_MARKER = "Plan mode is enabled";
 export const PLAN_MODE_SYSTEM_PROMPT = `${PLAN_MODE_ENABLED_MARKER}. You are in planning phase only — do not write code or files yet.`;
@@ -45,7 +54,7 @@ const READ_ONLY_TOOLS = [
             required: ["path"],
         },
     },
-] satisfies Anthropic.Tool[];
+] satisfies AgentToolDefinition[];
 
 export const PLAN_MODE_TOOLS = [
     {
@@ -86,10 +95,20 @@ export const PLAN_MODE_TOOLS = [
         },
     },
     ...READ_ONLY_TOOLS,
-] satisfies Anthropic.Tool[];
+] satisfies AgentToolDefinition[];
 
-export function getAgentTools(planMode: boolean): Anthropic.Tool[] {
-    return planMode ? PLAN_MODE_TOOLS : AGENT_TOOLS;
+export function getAgentTools(planMode: boolean) {
+    const definitions = planMode ? PLAN_MODE_TOOLS : AGENT_TOOLS;
+
+    // Groq uses the OpenAI-compatible function-tool schema.
+    return definitions.map((tool) => ({
+        type: "function" as const,
+        function: {
+            name: tool.name,
+            description: tool.description,
+            parameters: tool.input_schema,
+        },
+    }));
 }
 
 export function isPlanModeMessage(content: string) {
@@ -298,4 +317,4 @@ export const AGENT_TOOLS = [
             required: ["summary"],
         },
     },
-] satisfies Anthropic.Tool[];
+] satisfies AgentToolDefinition[];

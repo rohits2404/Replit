@@ -1,8 +1,8 @@
-const DEFAULT_MAX_TOKENS = 16_384;
+const DEFAULT_MAX_TOKENS = 700;
 const DEFAULT_MAX_TURNS = 48;
 
-export const ANTHROPIC_MAX_TOKENS = readIntEnv(
-    process.env.ANTHROPIC_MAX_TOKENS,
+export const GROQ_MAX_TOKENS = readIntEnv(
+    process.env.GROQ_MAX_TOKENS,
     DEFAULT_MAX_TOKENS,
 );
 export const MAX_AGENT_TURNS = readIntEnv(
@@ -15,7 +15,9 @@ export const MAX_AGENT_CONTINUE_NUDGES = readIntEnv(
     5,
 );
 
-const DEFAULT_MODEL = "claude-sonnet-4-6";
+// Qwen 3.8 is multimodal and supports local tool calling on Groq.
+// Override this in .env if you choose another model enabled for your account.
+const DEFAULT_MODEL = "qwen/qwen3.8-27b";
 
 function readIntEnv(value: string | undefined, fallback: number) {
     if (!value?.trim()) return fallback;
@@ -23,6 +25,6 @@ function readIntEnv(value: string | undefined, fallback: number) {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-export function getAnthropicModel() {
-    return process.env.ANTHROPIC_MODEL?.trim() || DEFAULT_MODEL;
+export function getGroqModel() {
+    return process.env.GROQ_MODEL?.trim() || DEFAULT_MODEL;
 }

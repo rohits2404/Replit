@@ -1,7 +1,7 @@
 import {
-    ANTHROPIC_MAX_TOKENS,
+    GROQ_MAX_TOKENS,
     MAX_AGENT_TURNS,
-    getAnthropicModel,
+    getGroqModel,
 } from "@/lib/agent/constants";
 
 import { PublishVisibility } from "../publish/visibility";
@@ -24,14 +24,14 @@ export const FREE_PRIVATE_DEPLOYMENT_LIMIT = 1;
 
 const FREE_AGENT_LIMITS: AgentLimits = {
     maxTurns: 12,
-    maxTokens: 8_192,
-    model: "claude-sonnet-4-6",
+    maxTokens: 700,
+    model: "qwen/qwen3.8-27b",
 };
 
 const PRO_AGENT_LIMITS: AgentLimits = {
     maxTurns: MAX_AGENT_TURNS,
-    maxTokens: ANTHROPIC_MAX_TOKENS,
-    model: getAnthropicModel(),
+    maxTokens: GROQ_MAX_TOKENS,
+    model: getGroqModel(),
 };
 
 export function isProUser(user: UserBillingFields): boolean {

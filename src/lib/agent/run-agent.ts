@@ -1,17 +1,15 @@
 import { access } from "node:fs/promises";
 import path from "node:path";
 
-import type Anthropic from "@anthropic-ai/sdk";
-
-import { getAnthropicClient } from "@/lib/anthropic";
+import { getGroqClient } from "@/lib/groq";
 import { applyFileEdit } from "@/lib/agent/apply-file-edit";
 import { buildArtifactContextSnapshot } from "@/lib/agent/build-artifact-context";
 import { getArtifactForProject } from "@/lib/agent/access";
 import {
-    ANTHROPIC_MAX_TOKENS,
+    GROQ_MAX_TOKENS,
     MAX_AGENT_CONTINUE_NUDGES,
     MAX_AGENT_TURNS,
-    getAnthropicModel,
+    getGroqModel,
 } from "@/lib/agent/constants";
 import type { AgentLimits } from "@/lib/billing/entitlements";
 import {
@@ -61,6 +59,28 @@ import { prisma } from "@/lib/prisma";
 
 const MAX_AGENT_MESSAGES = 50;
 const BUILD_NOT_READY_PREFIX = "BUILD_NOT_READY:";
+
+type GroqMessage = Record<string, any>;
+type GroqTool = {
+    type: "function";
+    function: {
+        name: string;
+        description?: string;
+        parameters: Record<string, unknown>;
+    };
+};
+type GroqToolResult = { role: "tool"; tool_call_id: string; content: string };
+type NormalizedToolUse = {
+    id: string;
+    name: string;
+    input: Record<string, unknown>;
+};
+type NormalizedAssistantResponse = {
+    assistantMessage: GroqMessage;
+    text: string;
+    toolUses: NormalizedToolUse[];
+    stopReason: string | null;
+};
 
 type ValidateArtifactPreviewResult =
     | { ok: true; stack: ProjectStack }
@@ -526,52 +546,109 @@ async function executeTool(
 }
 
 async function streamAssistantTurn(
-    client: Anthropic,
+    client: ReturnType<typeof getGroqClient>,
     systemPrompt: string,
-    chatMessages: Anthropic.MessageParam[],
-    tools: Anthropic.Tool[],
+    chatMessages: GroqMessage[],
+    tools: GroqTool[],
     ctx: ToolContext,
     limits: AgentLimits,
-) {
-    const stream = client.messages.stream({
+): Promise<NormalizedAssistantResponse> {
+    // Groq's Chat Completions API uses OpenAI-compatible messages and function tools.
+    const stream = await client.chat.completions.create({
         model: limits.model,
-        max_tokens: limits.maxTokens,
-        system: systemPrompt,
-        tools,
-        messages: chatMessages,
+        max_completion_tokens: Math.min(limits.maxTokens, 700),
+        messages: [
+            { role: "system", content: systemPrompt },
+            ...chatMessages,
+        ] as any,
+        tools: tools as any,
+        tool_choice: "auto",
+        parallel_tool_calls: false,
+        reasoning_effort: "medium",
+        stream: true,
     });
 
-    const toolBlocks = new Map<number, StreamingToolBlock>();
-    let textSnapshot = "";
+    let text = "";
+    let finishReason: string | null = null;
+    const toolCalls = new Map<
+        number,
+        { id: string; name: string; arguments: string }
+    >();
 
-    stream.on("streamEvent", (event) => {
-        if (
-            event.type === "content_block_start" &&
-            event.content_block.type === "tool_use"
-        ) {
-            toolBlocks.set(event.index, {
-                id: event.content_block.id,
-                name: event.content_block.name,
-                json: "",
-            });
+    for await (const chunk of stream) {
+        const choice = chunk.choices[0];
+        if (!choice) continue;
+        if (choice.finish_reason) finishReason = choice.finish_reason;
+
+        const delta = choice.delta;
+        if (typeof delta.content === "string") {
+            text += delta.content;
+            ctx.onEvent?.({ type: "text_delta", content: text });
         }
 
-        if (event.type === "content_block_delta") {
-            if (event.delta.type === "input_json_delta") {
-                const block = toolBlocks.get(event.index);
-                if (!block) return;
-                block.json += event.delta.partial_json;
-                handleStreamingToolDelta(ctx, block);
+        for (const partial of delta.tool_calls ?? []) {
+            const index = partial.index;
+            const existing = toolCalls.get(index) ?? {
+                id: "",
+                name: "",
+                arguments: "",
+            };
+            if (partial.id) existing.id += partial.id;
+            if (partial.function?.name) existing.name += partial.function.name;
+            if (partial.function?.arguments) {
+                existing.arguments += partial.function.arguments;
+                handleStreamingToolDelta(ctx, {
+                    id: existing.id,
+                    name: existing.name,
+                    json: existing.arguments,
+                });
             }
-
-            if (event.delta.type === "text_delta") {
-                textSnapshot += event.delta.text;
-                ctx.onEvent?.({ type: "text_delta", content: textSnapshot });
-            }
+            toolCalls.set(index, existing);
         }
-    });
+    }
 
-    return stream.finalMessage();
+    const normalizedCalls: NormalizedToolUse[] = [...toolCalls.entries()]
+        .sort(([a], [b]) => a - b)
+        .map(([, call]) => {
+            let input: Record<string, unknown> = {};
+            try {
+                const parsed: unknown = JSON.parse(call.arguments || "{}");
+                if (
+                    parsed &&
+                    typeof parsed === "object" &&
+                    !Array.isArray(parsed)
+                ) {
+                    input = parsed as Record<string, unknown>;
+                }
+            } catch {
+                input = {};
+            }
+            return { id: call.id, name: call.name, input };
+        });
+
+    const assistantMessage: GroqMessage = {
+        role: "assistant",
+        content: text || null,
+    };
+    if (toolCalls.size > 0) {
+        assistantMessage.tool_calls = [...toolCalls.entries()]
+            .sort(([a], [b]) => a - b)
+            .map(([, call]) => ({
+                id: call.id,
+                type: "function",
+                function: {
+                    name: call.name,
+                    arguments: call.arguments || "{}",
+                },
+            }));
+    }
+
+    return {
+        assistantMessage,
+        text,
+        toolUses: normalizedCalls,
+        stopReason: finishReason,
+    };
 }
 
 function buildUserMessageParam(
@@ -580,7 +657,7 @@ function buildUserMessageParam(
         mediaType: "image/jpeg" | "image/png" | "image/gif" | "image/webp";
         data: string;
     }>,
-): Anthropic.MessageParam {
+): GroqMessage {
     if (images.length === 0) {
         return { role: "user", content: text };
     }
@@ -588,15 +665,13 @@ function buildUserMessageParam(
     return {
         role: "user",
         content: [
-            ...images.map((image) => ({
-                type: "image" as const,
-                source: {
-                    type: "base64" as const,
-                    media_type: image.mediaType,
-                    data: image.data,
+            ...images.slice(0, 3).map((image) => ({
+                type: "image_url",
+                image_url: {
+                    url: `data:${image.mediaType};base64,${image.data}`,
                 },
             })),
-            { type: "text" as const, text },
+            { type: "text", text },
         ],
     };
 }
@@ -608,14 +683,14 @@ export async function runAgentLoop({
     limits,
     onEvent,
 }: RunAgentLoopOptions): Promise<AgentRunResult> {
-    if (!process.env.ANTHROPIC_API_KEY) {
-        throw new Error("Anthropic API key is not configured.");
+    if (!process.env.GROQ_API_KEY) {
+        throw new Error("Groq API key is not configured.");
     }
 
     const agentLimits: AgentLimits = limits ?? {
         maxTurns: MAX_AGENT_TURNS,
-        maxTokens: ANTHROPIC_MAX_TOKENS,
-        model: getAnthropicModel(),
+        maxTokens: GROQ_MAX_TOKENS,
+        model: getGroqModel(),
     };
 
     const artifact = await getArtifactForProject(projectId, artifactId);
@@ -701,7 +776,7 @@ export async function runAgentLoop({
         hasExistingFiles,
     });
 
-    const chatMessages: Anthropic.MessageParam[] = [];
+    const chatMessages: GroqMessage[] = [];
     let injectedVision = false;
 
     for (const message of messages) {
@@ -751,7 +826,7 @@ export async function runAgentLoop({
 
     onEvent?.({ type: "status", phase: "working", actionCount: 0 });
 
-    const client = getAnthropicClient();
+    const client = getGroqClient();
     let summary = "";
     let turn = 0;
     let continueNudges = 0;
@@ -768,19 +843,12 @@ export async function runAgentLoop({
             ctx,
             agentLimits,
         );
-        chatMessages.push({ role: "assistant", content: response.content });
+        chatMessages.push(response.assistantMessage);
 
-        const toolUses = response.content.filter(
-            (block): block is Anthropic.ToolUseBlock =>
-                block.type === "tool_use",
-        );
+        const toolUses = response.toolUses;
 
         if (toolUses.length === 0) {
-            const textBlock = response.content.find(
-                (block) => block.type === "text",
-            );
-            const text =
-                textBlock?.type === "text" ? textBlock.text.trim() : "";
+            const text = response.text.trim();
 
             const buildInProgress =
                 !ctx.buildValid &&
@@ -810,7 +878,7 @@ export async function runAgentLoop({
             break;
         }
 
-        const toolResults: Anthropic.ToolResultBlockParam[] = [];
+        const toolResults: GroqToolResult[] = [];
         let stopForQuestion = false;
 
         for (const toolUse of toolUses) {
@@ -843,8 +911,8 @@ export async function runAgentLoop({
             }
 
             toolResults.push({
-                type: "tool_result",
-                tool_use_id: toolUse.id,
+                role: "tool",
+                tool_call_id: toolUse.id,
                 content: result,
             });
         }
@@ -853,18 +921,15 @@ export async function runAgentLoop({
             break;
         }
 
-        chatMessages.push({ role: "user", content: toolResults });
+        chatMessages.push(...toolResults);
 
         if (summary) {
             break;
         }
 
-        if (response.stop_reason !== "tool_use" && !summary) {
-            const textBlock = response.content.find(
-                (block) => block.type === "text",
-            );
-            if (textBlock?.type === "text" && textBlock.text.trim()) {
-                const text = textBlock.text.trim();
+        if (response.stopReason !== "tool_calls" && !summary) {
+            if (response.text.trim()) {
+                const text = response.text.trim();
                 const buildInProgress =
                     !ctx.buildValid &&
                     !ctx.planQuestion &&

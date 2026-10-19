@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>TaskFlow — Task Management</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="styles.css" />
+    </head>
+    <body>
+        <div class="app" id="app">
+            <!-- Sidebar -->
+            <aside class="sidebar" id="sidebar" aria-label="Main navigation">
+                <div class="sidebar-brand">
+                    <div class="brand-logo">
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2.2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <path d="M9 11l3 3L22 4" />
+                            <path
+                                d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"
+                            />
+                        </svg>
+                    </div>
+                    <span class="brand-name">TaskFlow</span>
+                </div>
+
+                <nav class="sidebar-nav">
+                    <button
+                        class="nav-item active"
+                        data-view="all"
+                        title="All tasks"
+                    >
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                            <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                            <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                            <rect x="14" y="14" width="7" height="7" rx="1.5" />
+                        </svg>
+                        <span>All Tasks</span>
+                    </button>
+                    <button
+                        class="nav-item"
+                        data-view="pending"
+                        title="Pending tasks"
+                    >
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <circle cx="12" cy="12" r="9" />
+                            <path d="M12 7v5l3 3" />
+                        </svg>
+                        <span>Pending</span>
+                    </button>
+                    <button
+                        class="nav-item"
+                        data-view="completed"
+                        title="Completed tasks"
+                    >
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <circle cx="12" cy="12" r="9" />
+                            <path d="M8 12l3 3 5-6" />
+                        </svg>
+                        <span>Completed</span>
+                    </button>
+                    <button
+                        class="nav-item"
+                        data-view="overdue"
+                        title="Overdue tasks"
+                    >
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <path
+                                d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"
+                            />
+                            <line x1="12" y1="9" x2="12" y2="13" />
+                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                        </svg>
+                        <span>Overdue</span>
+                    </button>
+                </nav>
+
+                <div class="sidebar-footer">
+                    <div class="sidebar-progress">
+                        <div class="sidebar-progress-label">
+                            <span>Progress</span>
+                            <span id="sidebarPct">0%</span>
+                        </div>
+                        <div class="progress-track">
+                            <div
+                                class="progress-fill"
+                                id="sidebarProgressFill"
+                                style="width: 0%"
+                            ></div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Mobile overlay -->
+            <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+            <!-- Main -->
+            <main class="main">
+                <header class="topbar">
+                    <button
+                        class="icon-btn sidebar-toggle"
+                        id="sidebarToggle"
+                        aria-label="Toggle sidebar"
+                    >
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                        >
+                            <line x1="3" y1="6" x2="21" y2="6" />
+                            <line x1="3" y1="12" x2="21" y2="12" />
+                            <line x1="3" y1="18" x2="21" y2="18" />
+                        </svg>
+                    </button>
+                    <div class="search-wrap">
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <circle cx="11" cy="11" r="7" />
+                            <line x1="21" y1="21" x2="16.5" y2="16.5" />
+                        </svg>
+                        <input
+                            type="text"
+                            id="searchInput"
+                            placeholder="Search tasks…"
+                            aria-label="Search tasks"
+                        />
+                    </div>
+                    <button class="btn btn-primary" id="newTaskBtn">
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2.4"
+                            stroke-linecap="round"
+                        >
+                            <line x1="12" y1="5" x2="12" y2="19" />
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                        </svg>
+                        <span>New Task</span>
+                    </button>
+                </header>
+
+                <div class="content">
+                    <!-- Dashboard -->
+                    <section class="dashboard" aria-label="Dashboard">
+                        <div class="stat-card">
+                            <div class="stat-icon stat-icon-blue">
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
+                                    <path
+                                        d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"
+                                    />
+                                    <path d="M14 2v6h6" />
+                                    <line x1="8" y1="13" x2="16" y2="13" />
+                                    <line x1="8" y1="17" x2="13" y2="17" />
+                                </svg>
+                            </div>
+                            <div>
+                                <div class="stat-value" id="statTotal">0</div>
+                                <div class="stat-label">Total Tasks</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon stat-icon-green">
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
+                                    <circle cx="12" cy="12" r="9" />
+                                    <path d="M8 12l3 3 5-6" />
+                                </svg>
+                            </div>
+                            <div>
+                                <div class="stat-value" id="statCompleted">
+                                    0
+                                </div>
+                                <div class="stat-label">Completed</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon stat-icon-amber">
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
+                                    <circle cx="12" cy="12" r="9" />
+                                    <path d="M12 7v5l3 3" />
+                                </svg>
+                            </div>
+                            <div>
+                                <div class="stat-value" id="statPending">0</div>
+                                <div class="stat-label">Pending</div>
+                            </div>
+                        </div>
+                        <div class="stat-card stat-card-ring">
+                            <div class="ring-wrap">
+                                <svg class="ring" viewBox="0 0 36 36">
+                                    <circle
+                                        class="ring-bg"
+                                        cx="18"
+                                        cy="18"
+                                        r="15.5"
+                                        fill="none"
+                                        stroke-width="3.4"
+                                    />
+                                    <circle
+                                        class="ring-fg"
+                                        id="ringFg"
+                                        cx="18"
+                                        cy="18"
+                                        r="15.5"
+                                        fill="none"
+                                        stroke-width="3.4"
+                                        stroke-linecap="round"
+                                        transform="rotate(-90 18 18)"
+                                    />
+                                </svg>
+                                <span class="ring-label" id="statPct">0%</span>
+                            </div>
+                            <div>
+                                <div class="stat-label stat-label-top">
+                                    Completion
+                                </div>
+                                <div class="stat-label">Rate</div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Filters -->
+                    <section class="filters" aria-label="Filters">
+                        <div class="filter-group">
+                            <span class="filter-label">Status</span>
+                            <div
+                                class="segmented"
+                                id="statusFilter"
+                                role="group"
+                                aria-label="Filter by status"
+                            >
+                                <button
+                                    class="seg-btn active"
+                                    data-status="all"
+                                >
+                                    All
+                                </button>
+                                <button class="seg-btn" data-status="pending">
+                                    Pending
+                                </button>
+                                <button class="seg-btn" data-status="completed">
+                                    Done
+                                </button>
+                            </div>
+                        </div>
+                        <div class="filter-group">
+                            <span class="filter-label"> <</span>
+                        </div>
+                    </section>
+                </div>
+            </main>
+        </div>
+    </body>
+</html>
