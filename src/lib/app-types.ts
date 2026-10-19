@@ -71,7 +71,7 @@ export const buildFilterOptions: {
     value: ProjectBuildFilter;
     label: string;
 }[] = [
-    { value: "all", label: "Any build type" },
+    { value: "all", label: "Any Build Type" },
     { value: "WEB_APP", label: "Web" },
     { value: "MOBILE_APP", label: "Mobile" },
     { value: "DATA_VIZ", label: "Data" },
@@ -83,8 +83,8 @@ export const buildFilterOptions: {
 ];
 
 export const sortOptions: { value: ProjectSort; label: string }[] = [
-    { value: "last_opened", label: "Last opened by you" },
-    { value: "last_updated", label: "Last updated" },
+    { value: "last_opened", label: "Last Opened By You" },
+    { value: "last_updated", label: "Last Updated" },
     { value: "name", label: "Name" },
 ];
 
@@ -104,8 +104,8 @@ export const categoryToArtifactType: Record<
 };
 
 export const artifactTypeLabels: Record<ArtifactType, string> = {
-    WEB_APP: "Web app",
-    MOBILE_APP: "Mobile app",
+    WEB_APP: "Web App",
+    MOBILE_APP: "Mobile App",
     DATA_VIZ: "Data",
     SLIDES: "Slides",
     ANIMATION: "Animation",

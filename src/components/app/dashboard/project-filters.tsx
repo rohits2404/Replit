@@ -22,7 +22,7 @@ export function ProjectFilters({
     return (
         <div className="flex flex-col gap-3 tablet-up:flex-row tablet-up:items-center tablet-up:justify-between">
             <p className="text-sm text-app-text-muted">
-                {projectCount} project{projectCount === 1 ? "" : "s"}
+                {projectCount} Project{projectCount === 1 ? "" : "s"}
             </p>
             <div className="flex flex-col gap-2 mobile:grid mobile:grid-cols-1 tablet-up:flex-row tablet-up:items-center tablet-up:gap-2">
                 <Select
