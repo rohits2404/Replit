@@ -29,5 +29,5 @@ export function fromDeploymentVisibility(
 }
 
 export function publishedPath(workspaceSlug: string, projectSlug: string) {
-    return `/p/${workspaceSlug}/${projectSlug}`;
+    return `/workpsace/${workspaceSlug}/${projectSlug}`;
 }
